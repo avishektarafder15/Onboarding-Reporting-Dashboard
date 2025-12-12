@@ -1,0 +1,5 @@
+{
+  "name": "Onboarding Report Dashboard",
+  "description": "A comprehensive reporting dashboard for call center metrics including call allocations, backlog distribution, and daily performance statistics.",
+  "requestFramePermissions": []
+}
