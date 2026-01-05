@@ -32,21 +32,17 @@ const CallbackTable: React.FC<Props> = ({ data }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mb-6">
        {/* Top Header */}
-       <div className="bg-[#dcfce7] border-b border-green-200 p-3 flex flex-wrap justify-between items-center px-4 gap-4">
-          <div className="flex items-center gap-6">
-             <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-900 text-sm md:text-base">Call Back Date</span>
-             </div>
-             <div className="font-bold text-gray-900 text-sm md:text-base">11-12-2025</div>
-          </div>
+       <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+          <h3 className="font-bold text-gray-800 text-lg">
+             Callback Report <span className="text-gray-500 font-medium text-base ml-2">11-12-2025</span>
+          </h3>
 
           <div className="flex items-center gap-2">
-             <label htmlFor="caller-select" className="text-sm font-semibold text-gray-700">Welcome Caller Name:</label>
              <select 
                 id="caller-select"
                 value={selectedCaller}
                 onChange={(e) => setSelectedCaller(e.target.value)}
-                className="bg-white border border-green-400 text-gray-900 text-sm rounded focus:ring-green-500 focus:border-green-500 block px-2 py-1 outline-none shadow-sm"
+                className="bg-white border border-gray-300 text-gray-700 text-sm rounded-md focus:ring-indigo-500 focus:border-indigo-500 block px-3 py-1.5 outline-none shadow-sm"
              >
                 {uniqueCallers.map(caller => (
                     <option key={caller} value={caller}>{caller}</option>
@@ -59,34 +55,33 @@ const CallbackTable: React.FC<Props> = ({ data }) => {
          {/* 
             Vertical Slider / Scroll Logic:
             Setting max-height to approx 10 rows. 
-            Row height is roughly 35-40px. 10 rows ~ 350-400px.
          */}
          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-             <table className="min-w-full text-xs md:text-sm border-collapse border border-gray-300 relative">
+             <table className="min-w-full text-xs md:text-sm border-collapse border border-gray-200 relative">
                <thead className="sticky top-0 z-10 shadow-sm">
-                 <tr className="bg-[#65a30d] text-white">
-                   <th className="border border-gray-300 px-2 py-3 w-16 text-center bg-[#65a30d]">Sr No.</th>
-                   <th className="border border-gray-300 px-2 py-3 text-center min-w-[300px] bg-[#65a30d]">Course</th>
-                   <th className="border border-gray-300 px-2 py-3 text-center bg-[#65a30d]">Student Email ID</th>
-                   <th className="border border-gray-300 px-2 py-3 text-center whitespace-nowrap bg-[#65a30d]">Welcome Caller Name</th>
-                   <th className="border border-gray-300 px-2 py-3 text-center whitespace-nowrap bg-[#4d7c0f]">LawSikho Callbacks Time</th>
-                   <th className="border border-gray-300 px-2 py-3 text-center whitespace-nowrap bg-[#4d7c0f]">Skill Arbitrage Call Backs Time</th>
+                 <tr className="bg-gray-100 text-gray-700 font-semibold">
+                   <th className="border border-gray-200 px-3 py-3 w-16 text-center">Sr No.</th>
+                   <th className="border border-gray-200 px-3 py-3 text-center min-w-[300px]">Course</th>
+                   <th className="border border-gray-200 px-3 py-3 text-center">Student Email ID</th>
+                   <th className="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">Welcome Caller Name</th>
+                   <th className="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">LawSikho Callbacks Time</th>
+                   <th className="border border-gray-200 px-3 py-3 text-center whitespace-nowrap">Skill Arbitrage Call Backs Time</th>
                  </tr>
                </thead>
                <tbody>
                  {filteredData.map((row, index) => (
-                   <tr key={row.id} className="hover:bg-gray-50 bg-white">
-                     <td className="border border-gray-300 px-2 py-1.5 text-center font-bold text-gray-800">{index + 1}</td>
-                     <td className="border border-gray-300 px-2 py-1.5 italic text-gray-700">{row.course}</td>
-                     <td className="border border-gray-300 px-2 py-1.5 font-bold text-gray-800">{row.email}</td>
-                     <td className="border border-gray-300 px-2 py-1.5 text-center text-gray-800">{row.caller}</td>
-                     <td className="border border-gray-300 px-2 py-1.5 text-center font-bold text-gray-800">{row.lawSikhoTime}</td>
-                     <td className="border border-gray-300 px-2 py-1.5 text-center font-bold text-gray-800">{row.skillArbitrageTime}</td>
+                   <tr key={row.id} className="hover:bg-gray-50 bg-white border-b border-gray-100">
+                     <td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700">{index + 1}</td>
+                     <td className="border border-gray-200 px-3 py-2 italic text-gray-600">{row.course}</td>
+                     <td className="border border-gray-200 px-3 py-2 font-medium text-gray-800">{row.email}</td>
+                     <td className="border border-gray-200 px-3 py-2 text-center text-gray-700">{row.caller}</td>
+                     <td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700">{row.lawSikhoTime}</td>
+                     <td className="border border-gray-200 px-3 py-2 text-center font-medium text-gray-700">{row.skillArbitrageTime}</td>
                    </tr>
                  ))}
                  {filteredData.length === 0 && (
                     <tr>
-                        <td colSpan={6} className="border border-gray-300 px-4 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="border border-gray-200 px-4 py-8 text-center text-gray-500">
                             No callback records found.
                         </td>
                     </tr>

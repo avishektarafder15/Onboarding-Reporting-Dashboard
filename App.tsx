@@ -13,6 +13,9 @@ import OutcomeDistributionChart from './components/OutcomeDistributionChart';
 import DailyTrendChart from './components/DailyTrendChart';
 import CallbackTable from './components/CallbackTable';
 import LeadConversionTable from './components/LeadConversionTable';
+import LeadConversionStackedBarChart from './components/LeadConversionStackedBarChart';
+import LeadConversionAgentChart from './components/LeadConversionAgentChart';
+import LeadConversionPieChart from './components/LeadConversionPieChart';
 import { BacklogData, PerformanceData, TrendData, TeamMemberPerformance, DailyTrendData, CallbackData, LeadConversionData } from './types';
 
 const App: React.FC = () => {
@@ -200,13 +203,36 @@ const App: React.FC = () => {
     });
   }, [selectedTeamMembers]);
 
-  // Filter Lead Conversion Data
+  // Filter Lead Conversion Data (Global)
   const filteredLeadConversionData = useMemo(() => {
      return leadConversionDataRaw.filter(item => {
         if (selectedTeamMembers.includes('All Team Members')) return true;
         return selectedTeamMembers.includes(item.name);
      });
   }, [selectedTeamMembers]);
+
+  // 8. Lead Conversion Table Specific Filter
+  // This filter is specific to the "Last Table" and affects the table and graphs below it, but NOT above it.
+  const [leadConversionSelectedMember, setLeadConversionSelectedMember] = useState('All');
+
+  const uniqueLeadConversionMembers = useMemo(() => {
+    // Get members available in the globally filtered dataset
+    const members = new Set(filteredLeadConversionData.map(item => item.name));
+    return Array.from(members).sort();
+  }, [filteredLeadConversionData]);
+
+  // Reset local filter if selected member is no longer in global filter
+  useEffect(() => {
+      if (leadConversionSelectedMember !== 'All' && !uniqueLeadConversionMembers.includes(leadConversionSelectedMember)) {
+          setLeadConversionSelectedMember('All');
+      }
+  }, [uniqueLeadConversionMembers, leadConversionSelectedMember]);
+
+  const finalLeadConversionData = useMemo(() => {
+      if (leadConversionSelectedMember === 'All') return filteredLeadConversionData;
+      return filteredLeadConversionData.filter(item => item.name === leadConversionSelectedMember);
+  }, [filteredLeadConversionData, leadConversionSelectedMember]);
+
 
   return (
     <div className="flex h-screen bg-[#f3f4f6] overflow-hidden relative">
@@ -286,9 +312,21 @@ const App: React.FC = () => {
               <CallbackTable data={filteredCallbackData} />
             </div>
 
-            {/* Lead Conversion Summary Table - Reactive to Table Filter */}
+            {/* Lead Conversion Summary Table - Reactive to Table Filter + Local Filter */}
             <div className="mb-6">
-              <LeadConversionTable data={filteredLeadConversionData} />
+              <LeadConversionTable 
+                 data={finalLeadConversionData} 
+                 allMembers={uniqueLeadConversionMembers}
+                 selectedMember={leadConversionSelectedMember}
+                 onMemberChange={setLeadConversionSelectedMember}
+              />
+            </div>
+
+            {/* Lead Conversion Charts - Reactive to Table Filter + Local Filter */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px] mb-6">
+               <LeadConversionStackedBarChart data={finalLeadConversionData} />
+               <LeadConversionAgentChart data={finalLeadConversionData} />
+               <LeadConversionPieChart data={finalLeadConversionData} />
             </div>
 
           </div>
