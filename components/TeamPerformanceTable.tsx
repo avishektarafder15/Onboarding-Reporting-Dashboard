@@ -13,7 +13,7 @@ const TeamPerformanceTable: React.FC<Props> = ({
   data, 
   allMembers, 
   selectedMembers, 
-  onMemberSelectionChange 
+  onMemberSelectionChange
 }) => {
   // Calculate totals for footer
   const totals = data.reduce((acc, curr) => ({
@@ -48,7 +48,7 @@ const TeamPerformanceTable: React.FC<Props> = ({
                </div>
            </div>
            
-           <div>
+           <div className="flex items-center gap-3">
              <TeamMemberSelector 
                 members={allMembers}
                 selectedMembers={selectedMembers}

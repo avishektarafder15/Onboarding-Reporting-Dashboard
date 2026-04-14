@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Filters from './components/Filters';
@@ -16,49 +17,92 @@ import LeadConversionTable from './components/LeadConversionTable';
 import LeadConversionStackedBarChart from './components/LeadConversionStackedBarChart';
 import LeadConversionAgentChart from './components/LeadConversionAgentChart';
 import LeadConversionPieChart from './components/LeadConversionPieChart';
-import { BacklogData, PerformanceData, TrendData, TeamMemberPerformance, DailyTrendData, CallbackData, LeadConversionData } from './types';
+import ChartCustomizer from './components/ChartCustomizer';
+import UniversalChart from './components/UniversalChart';
+import { Plus, GripVertical, Layout } from 'lucide-react';
+import { BacklogData, PerformanceData, TrendData, TeamMemberPerformance, DailyTrendData, CallbackData, LeadConversionData, ChartConfig } from './types';
+
+interface Widget {
+  id: string;
+  type: string;
+  gridClass: string;
+}
 
 const App: React.FC = () => {
-  // Initialize sidebar state based on window width (desktop default open, mobile default closed)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [editingChartId, setEditingChartId] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [activeResizeMenu, setActiveResizeMenu] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
-    };
+  const [chartConfigs, setChartConfigs] = useState<Record<string, ChartConfig>>({
+    'daily-perf': {
+      id: 'daily-perf',
+      title: 'Daily Performance Overview',
+      type: 'bar',
+      xAxisKey: 'name',
+      series: [
+        { key: 'Eligible', name: 'Eligible Entries', color: '#6366f1' },
+        { key: 'Same-day', name: 'Same-day Success', color: '#8b5cf6' },
+        { key: 'Backlog Success', name: 'Backlog Success', color: '#ec4899' },
+        { key: 'Total Success', name: 'Total Success', color: '#10b981' },
+      ],
+      showTooltip: true,
+      showLegend: false
+    },
+    'backlog-dist': {
+      id: 'backlog-dist',
+      title: 'Backlog Distribution',
+      type: 'pie',
+      xAxisKey: 'name',
+      series: [
+        { key: 'On Hold', name: 'On Hold', color: '#F59E0B' },
+        { key: 'Follow Up', name: 'Follow Up', color: '#10B981' },
+        { key: 'Not Reachable', name: 'Not Reachable', color: '#EF4444' },
+        { key: 'Pending', name: 'Pending', color: '#3B82F6' },
+        { key: 'Call Drop', name: 'Call Drop', color: '#EC4899' },
+        { key: 'Deferred Start', name: 'Deferred Start', color: '#8B5CF6' },
+        { key: 'Miscellaneous', name: 'Miscellaneous', color: '#6B7280' },
+      ],
+      showTooltip: true,
+      showLegend: true
+    }
+  });
 
-    // Set initial state based on current width
-    handleResize();
-  }, []);
+  const [widgets, setWidgets] = useState<Widget[]>([
+    { id: 'report-table', type: 'report-table', gridClass: 'lg:col-span-4' },
+    { id: 'daily-perf', type: 'chart', gridClass: 'lg:col-span-4' },
+    { id: 'backlog-dist', type: 'chart', gridClass: 'lg:col-span-4' },
+    { id: 'trend-7-days', type: 'trend-7-days', gridClass: 'lg:col-span-12' },
+    { id: 'team-performance', type: 'team-performance', gridClass: 'lg:col-span-12' },
+    { id: 'agent-perf-comp', type: 'agent-perf-comp', gridClass: 'lg:col-span-4' },
+    { id: 'outcome-breakdown', type: 'outcome-breakdown', gridClass: 'lg:col-span-4' },
+    { id: 'outcome-dist', type: 'outcome-dist', gridClass: 'lg:col-span-4' },
+    { id: 'daily-trend-analysis', type: 'daily-trend-analysis', gridClass: 'lg:col-span-12' },
+    { id: 'callback-report', type: 'callback-report', gridClass: 'lg:col-span-12' },
+    { id: 'lead-conversion-report', type: 'lead-conversion-report', gridClass: 'lg:col-span-12' },
+    { id: 'lead-stacked-bar', type: 'lead-stacked-bar', gridClass: 'lg:col-span-4' },
+    { id: 'lead-agent-metrics', type: 'lead-agent-metrics', gridClass: 'lg:col-span-4' },
+    { id: 'lead-pie-attempts', type: 'lead-pie-attempts', gridClass: 'lg:col-span-4' },
+  ]);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  // 1. Daily Performance Overview Data (Static - Unaffected by table filter)
   const performanceData: PerformanceData[] = [
-    { name: 'Eligible', fullLabel: 'Eligible Entries (Today)', value: 48, color: '#6366f1' }, // Indigo
-    { name: 'Same-day', fullLabel: 'Same-day Successful Calls', value: 2, color: '#8b5cf6' }, // Violet
-    { name: 'Backlog Success', fullLabel: 'Successful from Backlog', value: 28, color: '#ec4899' }, // Pink
-    { name: 'Total Success', fullLabel: 'Total Successful Calls', value: 30, color: '#10b981' }, // Green
+    { name: 'Eligible', fullLabel: 'Eligible Entries (Today)', value: 48, color: '#6366f1' },
+    { name: 'Same-day', fullLabel: 'Same-day Successful Calls', value: 2, color: '#8b5cf6' },
+    { name: 'Backlog Success', fullLabel: 'Successful from Backlog', value: 28, color: '#ec4899' },
+    { name: 'Total Success', fullLabel: 'Total Successful Calls', value: 30, color: '#10b981' },
   ];
 
-  // 2. Backlog Distribution Data (Static - Unaffected by table filter)
   const backlogData: BacklogData[] = [
-    { name: 'On Hold', value: 6, color: '#F59E0B' }, // Amber
-    { name: 'Follow Up', value: 55, color: '#10B981' }, // Emerald
-    { name: 'Not Reachable', value: 40, color: '#EF4444' }, // Red
-    { name: 'Pending', value: 38, color: '#3B82F6' }, // Blue
-    { name: 'Call Drop', value: 4, color: '#EC4899' }, // Pink
-    { name: 'Deferred Start', value: 99, color: '#8B5CF6' }, // Violet
-    { name: 'Miscellaneous', value: 2, color: '#6B7280' }, // Gray
+    { name: 'On Hold', value: 6, color: '#F59E0B' },
+    { name: 'Follow Up', value: 55, color: '#10B981' },
+    { name: 'Not Reachable', value: 40, color: '#EF4444' },
+    { name: 'Pending', value: 38, color: '#3B82F6' },
+    { name: 'Call Drop', value: 4, color: '#EC4899' },
+    { name: 'Deferred Start', value: 99, color: '#8B5CF6' },
+    { name: 'Miscellaneous', value: 2, color: '#6B7280' },
   ];
 
-  // 3. Backlog Trend Data (Static - Unaffected by table filter)
   const trendData: TrendData[] = [
     { date: 'Nov 05', backlog: 265, successful: 25, eligible: 80 },
     { date: 'Nov 06', backlog: 258, successful: 22, eligible: 75 },
@@ -69,269 +113,227 @@ const App: React.FC = () => {
     { date: 'Nov 11', backlog: 244, successful: 30, eligible: 85 },
   ];
 
-  // 4. Team Performance Data
   const teamPerformanceData: TeamMemberPerformance[] = [
-    { name: 'Ritu Narula', attendance: 'WO', talkTimeFormatted: '00:00:00', talkTimeMinutes: 0, gsSuccessful: 0, successful: 0, totalSuccessful: 0, attempts: 0, followUp: null, notReachable: 0, pending: 1 },
+    { name: 'Ritu Narula', attendance: 'WO', talkTimeFormatted: '00:00:00', talkTimeMinutes: 0, gsSuccessful: 0, successful: 0, totalSuccessful: 0, attempts: 0, followUp: 0, notReachable: 0, pending: 1 },
     { name: 'Surendiranath SL', attendance: 'P', talkTimeFormatted: '06:27:06', talkTimeMinutes: 387, gsSuccessful: 0, successful: 8, totalSuccessful: 8, attempts: 38, followUp: 4, notReachable: 12, pending: 0 },
-    { name: 'Mohammad Faiz', attendance: 'P', talkTimeFormatted: '01:46:55', talkTimeMinutes: 107, gsSuccessful: 0, successful: 2, totalSuccessful: 2, attempts: 10, followUp: null, notReachable: 1, pending: 0 },
+    { name: 'Mohammad Faiz', attendance: 'P', talkTimeFormatted: '01:46:55', talkTimeMinutes: 107, gsSuccessful: 0, successful: 2, totalSuccessful: 2, attempts: 10, followUp: 0, notReachable: 1, pending: 0 },
     { name: 'Sujata Trikha', attendance: 'P', talkTimeFormatted: '02:36:38', talkTimeMinutes: 156, gsSuccessful: 0, successful: 2, totalSuccessful: 2, attempts: 15, followUp: 4, notReachable: 1, pending: 7 },
     { name: 'Suganya M', attendance: 'P', talkTimeFormatted: '07:01:34', talkTimeMinutes: 421, gsSuccessful: 2, successful: 6, totalSuccessful: 8, attempts: 29, followUp: 4, notReachable: 1, pending: 0 },
-    { name: 'Tanushri Srivastava', attendance: 'L', talkTimeFormatted: '00:00:00', talkTimeMinutes: 0, gsSuccessful: 0, successful: 0, totalSuccessful: 0, attempts: 0, followUp: null, notReachable: 0, pending: 4 },
+    { name: 'Tanushri Srivastava', attendance: 'L', talkTimeFormatted: '00:00:00', talkTimeMinutes: 0, gsSuccessful: 0, successful: 0, totalSuccessful: 0, attempts: 0, followUp: 0, notReachable: 0, pending: 4 },
     { name: 'Ashween Middha', attendance: 'P', talkTimeFormatted: '02:48:25', talkTimeMinutes: 168, gsSuccessful: 0, successful: 5, totalSuccessful: 5, attempts: 18, followUp: 1, notReachable: 4, pending: 7 },
     { name: 'Sohini Malakar', attendance: 'P', talkTimeFormatted: '05:49:15', talkTimeMinutes: 349, gsSuccessful: 0, successful: 6, totalSuccessful: 6, attempts: 24, followUp: 1, notReachable: 9, pending: 4 },
     { name: 'Jyothi Ganta', attendance: 'P', talkTimeFormatted: '03:36:37', talkTimeMinutes: 216, gsSuccessful: 0, successful: 4, totalSuccessful: 4, attempts: 24, followUp: 7, notReachable: 2, pending: 2 },
-    { name: 'Amol Gulabrao Khokale', attendance: 'WO', talkTimeFormatted: '00:00:00', talkTimeMinutes: 0, gsSuccessful: 0, successful: 0, totalSuccessful: 0, attempts: 0, followUp: null, notReachable: 0, pending: 0 },
     { name: 'Ankush Kumari', attendance: 'P', talkTimeFormatted: '05:25:19', talkTimeMinutes: 325, gsSuccessful: 0, successful: 5, totalSuccessful: 5, attempts: 20, followUp: 4, notReachable: 1, pending: 3 },
     { name: 'Durrain Shahwar', attendance: 'P', talkTimeFormatted: '04:46:25', talkTimeMinutes: 286, gsSuccessful: 0, successful: 4, totalSuccessful: 4, attempts: 14, followUp: 2, notReachable: 3, pending: 2 },
     { name: 'Mayank Mathuria', attendance: 'P', talkTimeFormatted: '04:49:41', talkTimeMinutes: 289, gsSuccessful: 1, successful: 5, totalSuccessful: 6, attempts: 20, followUp: 4, notReachable: 1, pending: 7 },
     { name: 'Adeeba Sheik', attendance: 'P', talkTimeFormatted: '04:30:59', talkTimeMinutes: 271, gsSuccessful: 0, successful: 4, totalSuccessful: 4, attempts: 31, followUp: 4, notReachable: 8, pending: 1 },
   ];
 
-  // 6. Callback Data (Mock data based on screenshot)
-  const callbackDataRaw: CallbackData[] = [
-    { id: 1, course: 'Diploma in Business Laws for In-House Counsels', email: 'priyalmodi1503@gmail.com', caller: 'Adeeba Sheik', lawSikhoTime: '11:30:00', skillArbitrageTime: '' },
-    { id: 2, course: 'Offer for Bootcamp on How To Build A Practice Around White Collar Crime As A Lawyer', email: 'bagadipinky2@gmail.com', caller: 'Adeeba Sheik', lawSikhoTime: '12:30:00', skillArbitrageTime: '' },
-    { id: 3, course: 'Offer for Bootcamp on How To Build A Practice Around White Collar Crime As A Lawyer', email: 'niharikap357@gmail.com', caller: 'Adeeba Sheik', lawSikhoTime: '18:00:00', skillArbitrageTime: '' },
-    { id: 4, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'mayamenon81@gmail.com', caller: 'Adeeba Sheik', lawSikhoTime: '', skillArbitrageTime: '10:45:00' },
-    { id: 5, course: 'Offer for Bootcamp on How can experienced professionals become Independent Directors', email: 'swati1bhatia@gmail.com', caller: 'Amol Gulabrao Khokale', lawSikhoTime: '', skillArbitrageTime: '15:00:00' },
-    { id: 6, course: 'Offer for Bootcamp on How can experienced professionals become Independent Directors', email: 'mjsnrg@gmail.com', caller: 'Amol Gulabrao Khokale', lawSikhoTime: '', skillArbitrageTime: '21:00:00' },
-    { id: 7, course: 'Diploma in Advanced Contract Drafting, Negotiation and Dispute Resolution', email: 'adv.ranjanbhoria@gmail.com', caller: 'Ankush Kumari', lawSikhoTime: '15:00:00', skillArbitrageTime: '' },
-    { id: 8, course: 'Offer for Corporate Litigation and Arbitration Bootcamp', email: 'advnp27@gmail.com', caller: 'Ankush Kumari', lawSikhoTime: '16:00:00', skillArbitrageTime: '' },
-    { id: 9, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'harjeetkaur_99@yahoo.com', caller: 'Ankush Kumari', lawSikhoTime: '', skillArbitrageTime: '15:00:00' },
-    { id: 10, course: 'Offer for Jumpstart your career in Tax Litigation, International Tax and Transfer Pricing', email: 'rajulbadjatya0511@gmail.com', caller: 'Ashween Middha', lawSikhoTime: '10:30:00', skillArbitrageTime: '' },
-    { id: 11, course: 'Offer for Bootcamp on How can experienced professionals become Independent Directors', email: 'ravisankarpichaia@gmail.com', caller: 'Ashween Middha', lawSikhoTime: '', skillArbitrageTime: '10:30:00' },
-    { id: 12, course: 'Offer for How to break into corporate finance and investment banking', email: 'sahilmore7224@gmail.com', caller: 'Ashween Middha', lawSikhoTime: '', skillArbitrageTime: '10:30:00' },
-    { id: 13, course: 'Offer for Bootcamp on How Indian lawyers can Crack The Solicitors Qualifying Exam (SQE)', email: 'mahjabeenshamim@gmail.com', caller: 'Durrain Shahwar', lawSikhoTime: '15:00:00', skillArbitrageTime: '' },
-    { id: 14, course: 'Offer for How Indian Accounting & Bookkeeping Professionals can Get US Jobs', email: 'susinkol@gmail.com', caller: 'Durrain Shahwar', lawSikhoTime: '', skillArbitrageTime: '20:00:00' },
-    { id: 15, course: 'Offer for How to Pass the Advocate-on-Record (AoR) Exam and Establish Your Supreme Court Practice', email: 'deeptanshu.shukla@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '10:30:00', skillArbitrageTime: '' },
-    { id: 16, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'arshiharis20@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '', skillArbitrageTime: '12:00:00' },
-    { id: 17, course: 'Offer for How to break into corporate finance and investment banking', email: 'mondalalamgir25@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '', skillArbitrageTime: '13:00:00' },
-    { id: 18, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'namithashaffy@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '', skillArbitrageTime: '15:00:00' },
-    { id: 19, course: 'Offer for Turbocharge your Career: Start a consulting business or startup', email: 'srinivasavuppalla@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '', skillArbitrageTime: '16:00:00' },
-    { id: 20, course: 'Offer for How Indian Accounting & Bookkeeping Professionals can Get US Jobs', email: 'sahprem1208@gmail.com', caller: 'Jyothi Ganta', lawSikhoTime: '', skillArbitrageTime: '19:00:00' },
-    { id: 21, course: 'Offer for How to make it big with Real Estate Law', email: '01jyotibips@gmail.com', caller: 'Mayank Mathuria', lawSikhoTime: '12:00:00', skillArbitrageTime: '' },
-    { id: 22, course: 'Offer for bootcamp on Master Contract Drafting', email: 'mahimakalia72@gmail.com', caller: 'Mayank Mathuria', lawSikhoTime: '13:00:00', skillArbitrageTime: '' },
-    { id: 23, course: 'Offer for How to Pass the Advocate-on-Record (AoR) Exam', email: 'sapnalin@rediffmail.com', caller: 'Mayank Mathuria', lawSikhoTime: '19:00:00', skillArbitrageTime: '' },
-    { id: 24, course: 'Offer for Bootcamp on Build a global career as an academic content writer', email: 'panjkarthi@gmail.com', caller: 'Mayank Mathuria', lawSikhoTime: '', skillArbitrageTime: '11:00:00' },
-    { id: 25, course: 'Offer for Bootcamp on How Indian lawyers can Crack The Solicitors Qualifying Exam', email: 'sourav1812@gmail.com', caller: 'Suganya M', lawSikhoTime: '18:00:00', skillArbitrageTime: '' },
-    { id: 26, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'bkbimba@gmail.com', caller: 'Suganya M', lawSikhoTime: '', skillArbitrageTime: '11:00:00' },
-    { id: 27, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'tahiyabacha@gmail.com', caller: 'Suganya M', lawSikhoTime: '', skillArbitrageTime: '12:00:00' },
-    { id: 28, course: 'US Tax Compliance and Paralegal Work', email: 'deepanshkapila@gmail.com', caller: 'Sujata Trikha', lawSikhoTime: '11:30:00', skillArbitrageTime: '' },
-    { id: 29, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'singhsargams@gmail.com', caller: 'Sujata Trikha', lawSikhoTime: '', skillArbitrageTime: '12:00:00' },
-    { id: 30, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'indu.mukund@gmail.com', caller: 'Sujata Trikha', lawSikhoTime: '', skillArbitrageTime: '14:00:00' },
-    { id: 31, course: 'Offer for How Indian Accounting & Bookkeeping Professionals can Get US Jobs', email: 'siddikafatma.siddiqui@gmail.com', caller: 'Sujata Trikha', lawSikhoTime: '', skillArbitrageTime: '15:00:00' },
-    { id: 32, course: 'Offer for How you can use labour law skills to go from HR manager to business leader', email: 'gshveta018@gmail.com', caller: 'Surendiranath SL', lawSikhoTime: '10:00:00', skillArbitrageTime: '' },
-    { id: 33, course: 'Offer for Bootcamp on Remote work revolution for women', email: 'ikshu.solutionz@gmail.com', caller: 'Surendiranath SL', lawSikhoTime: '', skillArbitrageTime: '20:00:00' },
-  ];
+  const callbackDataRaw: CallbackData[] = Array.from({ length: 25 }, (_, i) => ({
+    id: i + 1,
+    course: [
+      'Master of Corporate Law', 
+      'Executive Certificate in IP', 
+      'Cyber Law Specialization', 
+      'Contract Drafting Course',
+      'Diploma in M&A',
+      'Media and Entertainment Law'
+    ][i % 6],
+    email: `student${i + 1}@example.com`,
+    caller: teamPerformanceData[i % teamPerformanceData.length].name,
+    lawSikhoTime: `${10 + (i % 8)}:${(i * 7) % 60} AM`,
+    skillArbitrageTime: `${11 + (i % 8)}:${(i * 12) % 60} AM`,
+  }));
 
-  // 7. Lead Conversion Data (Match Screenshot Data)
-  const leadConversionDataRaw: LeadConversionData[] = [
-    { id: 1, shiftTiming: 'WO', name: 'Ritu Narula', attendance: 'WO', type: 'FTE', gsSuccessful: 0, successful: 0, totalSuccessful: 0, assigned: 1, attempted: 0, notAttempted: 0, attemptedPerc: 0, solvencyPerc: 0, abandoned: 0 },
-    { id: 2, shiftTiming: '10 AM - 8 PM', name: 'Mohammad Faiz', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 2, totalSuccessful: 2, assigned: 4, attempted: 2, notAttempted: 2, attemptedPerc: 50, solvencyPerc: 50, abandoned: 0 },
-    { id: 3, shiftTiming: 'L', name: 'Jahangir Ahmad', attendance: 'L', type: 'FTE', gsSuccessful: 0, successful: 0, totalSuccessful: 0, assigned: 1, attempted: 0, notAttempted: 0, attemptedPerc: 0, solvencyPerc: 0, abandoned: 0 },
-    { id: 4, shiftTiming: '2:00 PM-11:00 PM', name: 'Sujata Trikha', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 2, totalSuccessful: 2, assigned: 16, attempted: 7, notAttempted: 9, attemptedPerc: 44, solvencyPerc: 13, abandoned: 0 },
-    { id: 5, shiftTiming: '10 AM - 8 PM', name: 'Suganya M', attendance: 'P', type: 'FTE', gsSuccessful: 2, successful: 6, totalSuccessful: 8, assigned: 13, attempted: 13, notAttempted: 0, attemptedPerc: 100, solvencyPerc: 62, abandoned: 0 },
-    { id: 6, shiftTiming: 'L', name: 'Tanushri Srivastava', attendance: 'L', type: 'FTE', gsSuccessful: 0, successful: 0, totalSuccessful: 0, assigned: 5, attempted: 0, notAttempted: 0, attemptedPerc: 0, solvencyPerc: 0, abandoned: 0 },
-    { id: 7, shiftTiming: '10 AM - 8 PM', name: 'Ashween Middha', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 5, totalSuccessful: 5, assigned: 19, attempted: 11, notAttempted: 8, attemptedPerc: 58, solvencyPerc: 26, abandoned: 0 },
-    { id: 8, shiftTiming: '9 AM - 7 PM', name: 'Sohini Malakar', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 6, totalSuccessful: 6, assigned: 21, attempted: 12, notAttempted: 9, attemptedPerc: 57, solvencyPerc: 29, abandoned: 0 },
-    { id: 9, shiftTiming: '11 AM - 9 PM', name: 'Jyothi Ganta', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 4, totalSuccessful: 4, assigned: 15, attempted: 13, notAttempted: 2, attemptedPerc: 87, solvencyPerc: 27, abandoned: 0 },
-    { id: 10, shiftTiming: '2:00 PM-11:00 PM', name: 'Durrain Shahwar', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 4, totalSuccessful: 4, assigned: 15, attempted: 8, notAttempted: 7, attemptedPerc: 53, solvencyPerc: 27, abandoned: 0 },
-    { id: 11, shiftTiming: '2:30 PM-11:30 PM', name: 'Ankush Kumari', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 5, totalSuccessful: 5, assigned: 13, attempted: 10, notAttempted: 3, attemptedPerc: 77, solvencyPerc: 38, abandoned: 0 },
-    { id: 12, shiftTiming: '10 AM - 8 PM', name: 'Surendiranath SL', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 8, totalSuccessful: 8, assigned: 24, attempted: 24, notAttempted: 0, attemptedPerc: 100, solvencyPerc: 33, abandoned: 0 },
-    { id: 13, shiftTiming: '10 AM - 8 PM', name: 'Adeeba Sheik', attendance: 'P', type: 'FTE', gsSuccessful: 0, successful: 4, totalSuccessful: 4, assigned: 19, attempted: 16, notAttempted: 3, attemptedPerc: 84, solvencyPerc: 21, abandoned: 0 },
-    { id: 14, shiftTiming: '10 AM - 8 PM', name: 'Mayank Mathuria', attendance: 'P', type: 'FTE', gsSuccessful: 1, successful: 5, totalSuccessful: 6, assigned: 18, attempted: 11, notAttempted: 7, attemptedPerc: 61, solvencyPerc: 33, abandoned: 0 },
-    { id: 15, shiftTiming: 'WO', name: 'Amol Gulabrao Khokale', attendance: 'WO', type: 'FTE', gsSuccessful: 0, successful: 0, totalSuccessful: 0, assigned: 2, attempted: 0, notAttempted: 0, attemptedPerc: 0, solvencyPerc: 0, abandoned: 1 },
-  ];
-
-  // Extract unique team members names
-  const allTeamMembers = useMemo(() => Array.from(new Set(teamPerformanceData.map(item => item.name))), [teamPerformanceData]);
-
-  // State for selected team members - default to all
-  const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>(['All Team Members', ...allTeamMembers]);
-
-  // Filter logic for TeamPerformanceTable and the charts immediately following it
-  const filteredTeamPerformance = teamPerformanceData.filter(member => {
-    if (selectedTeamMembers.includes('All Team Members')) return true;
-    return selectedTeamMembers.includes(member.name);
+  const leadConversionDataRaw: LeadConversionData[] = Array.from({ length: 20 }, (_, i) => {
+    const member = teamPerformanceData[i % teamPerformanceData.length];
+    return {
+      id: i + 1,
+      shiftTiming: '09:00-18:00',
+      name: member.name,
+      attendance: member.attendance,
+      type: i % 3 === 0 ? 'PTE' : 'FTE',
+      gsSuccessful: Math.floor(Math.random() * 5),
+      successful: Math.floor(Math.random() * 10),
+      totalSuccessful: Math.floor(Math.random() * 15),
+      assigned: 40 + Math.floor(Math.random() * 20),
+      attempted: 20 + Math.floor(Math.random() * 15),
+      notAttempted: 5 + Math.floor(Math.random() * 10),
+      attemptedPerc: 60 + Math.floor(Math.random() * 30),
+      solvencyPerc: 10 + Math.floor(Math.random() * 20),
+      abandoned: Math.floor(Math.random() * 5),
+    };
   });
 
-  // Calculate participation ratio to scale the Daily Trend Data
-  const participationRatio = useMemo(() => {
-    if (selectedTeamMembers.includes('All Team Members')) return 1;
-    if (allTeamMembers.length === 0) return 0;
-    return selectedTeamMembers.length / allTeamMembers.length;
-  }, [selectedTeamMembers, allTeamMembers]);
+  const allTeamMembers = useMemo(() => Array.from(new Set(teamPerformanceData.map(item => item.name))), [teamPerformanceData]);
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>(['All Team Members', ...allTeamMembers]);
 
-  // 5. Daily Trend Data (Generated for 30 days) - Responsive to Table Filter
+  const filteredTeamPerformance = useMemo(() => {
+    return teamPerformanceData.filter(member => {
+        if (selectedTeamMembers.includes('All Team Members')) return true;
+        return selectedTeamMembers.includes(member.name);
+    });
+  }, [teamPerformanceData, selectedTeamMembers]);
+
   const dailyTrendData: DailyTrendData[] = useMemo(() => {
     return Array.from({ length: 30 }, (_, i) => {
-      // Start from Nov 1st
       const date = new Date('2025-11-01'); 
       date.setDate(date.getDate() + i);
-      
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      
-      // Base values that fluctuate
-      let talkTime = isWeekend ? 800 : 2800;
-      let successful = isWeekend ? 8 : 28;
-      let followUp = isWeekend ? 15 : 45;
-
-      // Use a pseudo-random multiplier based on index to keep the shape consistent but scalable
-      const pseudoRandom = (seed: number) => {
-          const x = Math.sin(seed * 9999);
-          return x - Math.floor(x);
-      }
-      
-      const randomMultiplier = 0.7 + pseudoRandom(i) * 0.6; // varies between 0.7x and 1.3x
-
-      // Apply participationRatio to simulate filtering
+      const randomMultiplier = 0.7 + Math.random() * 0.6;
       return {
         date: date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
-        talkTime: Math.floor(talkTime * randomMultiplier * participationRatio),
-        successful: Math.floor(successful * randomMultiplier * participationRatio),
-        followUp: Math.floor(followUp * randomMultiplier * participationRatio),
+        talkTime: Math.floor(2800 * randomMultiplier),
+        successful: Math.floor(28 * randomMultiplier),
+        followUp: Math.floor(45 * randomMultiplier),
       };
     });
-  }, [participationRatio]);
+  }, []);
 
-  // Filter Callback Data based on selected team members
   const filteredCallbackData = useMemo(() => {
     return callbackDataRaw.filter(item => {
       if (selectedTeamMembers.includes('All Team Members')) return true;
       return selectedTeamMembers.includes(item.caller);
     });
-  }, [selectedTeamMembers]);
+  }, [selectedTeamMembers, callbackDataRaw]);
 
-  // Filter Lead Conversion Data (Global)
   const filteredLeadConversionData = useMemo(() => {
-     return leadConversionDataRaw.filter(item => {
-        if (selectedTeamMembers.includes('All Team Members')) return true;
-        return selectedTeamMembers.includes(item.name);
-     });
-  }, [selectedTeamMembers]);
+    return leadConversionDataRaw.filter(item => {
+      if (selectedTeamMembers.includes('All Team Members')) return true;
+      return selectedTeamMembers.includes(item.name);
+    });
+  }, [selectedTeamMembers, leadConversionDataRaw]);
 
-  // 8. Lead Conversion Table Specific Filter
-  // This filter is specific to the "Last Table" and affects the table and graphs below it, but NOT above it.
-  const [leadConversionSelectedMember, setLeadConversionSelectedMember] = useState('All');
+  const handleApplyConfig = (newConfig: ChartConfig) => {
+    setChartConfigs(prev => ({ ...prev, [newConfig.id]: newConfig }));
+    setEditingChartId(null);
+  };
 
-  const uniqueLeadConversionMembers = useMemo(() => {
-    // Get members available in the globally filtered dataset
-    const members = new Set(filteredLeadConversionData.map(item => item.name));
-    return Array.from(members).sort();
-  }, [filteredLeadConversionData]);
+  const handleDeleteChart = (id: string) => {
+    setChartConfigs(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setWidgets(prev => prev.filter(w => w.id !== id));
+  };
 
-  // Reset local filter if selected member is no longer in global filter
-  useEffect(() => {
-      if (leadConversionSelectedMember !== 'All' && !uniqueLeadConversionMembers.includes(leadConversionSelectedMember)) {
-          setLeadConversionSelectedMember('All');
-      }
-  }, [uniqueLeadConversionMembers, leadConversionSelectedMember]);
+  const handleAddChart = () => {
+    const newId = `chart-${Date.now()}`;
+    const newConfig: ChartConfig = {
+      id: newId,
+      title: 'New Analytical Insight',
+      type: 'bar',
+      xAxisKey: 'name',
+      yAxisKey: 'calculatedValue',
+      calculatedLogic: '(successful / attempts) * 100',
+      series: [{ key: 'calculatedValue', name: 'Percentage', color: '#10b981' }],
+      showTooltip: true,
+      showLegend: true
+    };
+    setChartConfigs(prev => ({ ...prev, [newId]: newConfig }));
+    setWidgets(prev => [{ id: newId, type: 'custom-chart', gridClass: 'lg:col-span-4' }, ...prev]);
+    setEditingChartId(newId);
+  };
 
-  const finalLeadConversionData = useMemo(() => {
-      if (leadConversionSelectedMember === 'All') return filteredLeadConversionData;
-      return filteredLeadConversionData.filter(item => item.name === leadConversionSelectedMember);
-  }, [filteredLeadConversionData, leadConversionSelectedMember]);
+  const handleResizeWidget = (id: string, gridClass: string) => {
+    setWidgets(prev => prev.map(w => w.id === id ? { ...w, gridClass } : w));
+    setActiveResizeMenu(null);
+  };
 
+  const onDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+    setDragOverIndex(index);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    if (draggedIndex === null || dragOverIndex === null) return;
+    const newWidgets = [...widgets];
+    const itemToMove = newWidgets.splice(draggedIndex, 1)[0];
+    newWidgets.splice(dragOverIndex, 0, itemToMove);
+    setWidgets(newWidgets);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const renderWidget = (widget: Widget) => {
+    switch (widget.type) {
+      case 'report-table': return <ReportTable />;
+      case 'chart':
+        if (widget.id === 'daily-perf') return <DailyPerformanceChart data={performanceData} config={chartConfigs['daily-perf']} onEdit={() => setEditingChartId('daily-perf')} />;
+        if (widget.id === 'backlog-dist') return <DistributionChart data={backlogData} config={chartConfigs['backlog-dist']} onEdit={() => setEditingChartId('backlog-dist')} />;
+        return null;
+      case 'custom-chart':
+        const customConfig = chartConfigs[widget.id];
+        if (!customConfig) return null;
+        return <UniversalChart config={customConfig} data={filteredTeamPerformance} onEdit={() => setEditingChartId(customConfig.id)} onDelete={() => handleDeleteChart(customConfig.id)} isCustom />;
+      case 'trend-7-days': return <TrendChart data={trendData} />;
+      case 'team-performance': return <TeamPerformanceTable data={filteredTeamPerformance} allMembers={allTeamMembers} selectedMembers={selectedTeamMembers} onMemberSelectionChange={setSelectedTeamMembers} />;
+      case 'agent-perf-comp': return <AgentPerformanceChart data={filteredTeamPerformance} />;
+      case 'outcome-breakdown': return <OutcomeBreakdownChart data={filteredTeamPerformance} />;
+      case 'outcome-dist': return <OutcomeDistributionChart data={filteredTeamPerformance} />;
+      case 'daily-trend-analysis': return <DailyTrendChart data={dailyTrendData} />;
+      case 'callback-report': return <CallbackTable data={filteredCallbackData} />;
+      case 'lead-conversion-report': return <LeadConversionTable data={filteredLeadConversionData} allMembers={allTeamMembers} selectedMembers={selectedTeamMembers} onMembersChange={setSelectedTeamMembers} />;
+      case 'lead-stacked-bar': return <LeadConversionStackedBarChart data={filteredLeadConversionData} />;
+      case 'lead-agent-metrics': return <LeadConversionAgentChart data={filteredLeadConversionData} />;
+      case 'lead-pie-attempts': return <LeadConversionPieChart data={filteredLeadConversionData} />;
+      default: return null;
+    }
+  };
 
   return (
-    <div className="flex h-screen bg-[#f3f4f6] overflow-hidden relative">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#f3f4f6] overflow-hidden relative" onClick={() => setActiveResizeMenu(null)}>
       <Sidebar isOpen={isSidebarOpen} />
-
-      {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Content Area */}
-      <div 
-        className={`flex-1 flex flex-col h-full w-full transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
-        }`}
-      >
-        <Header toggleSidebar={toggleSidebar} />
-
-        <main className="flex-1 overflow-auto p-6">
+      {isSidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
+      <div className={`flex-1 flex flex-col h-full w-full transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}>
+        <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <main className="flex-1 overflow-auto p-6 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
-            {/* Top Filter Bar */}
             <Filters />
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6">
-              
-              {/* Left Column: Data Table */}
-              <div className="lg:col-span-4">
-                <ReportTable />
-              </div>
-
-              {/* Right Column: Charts Area */}
-              <div className="lg:col-span-8 flex flex-col gap-6">
-                
-                {/* Row 1: Daily Performance & Backlog Distribution (Static) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
-                  <DailyPerformanceChart data={performanceData} />
-                  <DistributionChart data={backlogData} />
+            <div className="flex justify-center mb-8">
+               <button onClick={handleAddChart} className="flex items-center gap-2 px-6 py-3 bg-white border border-indigo-200 text-indigo-700 font-bold rounded-full shadow-lg hover:bg-indigo-50 transition-all transform hover:scale-105 active:scale-95">
+                  <Plus className="w-5 h-5" />
+                  Add custom analytics chart
+               </button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
+              {widgets.map((widget, index) => (
+                <div key={widget.id} draggable onDragStart={(e) => onDragStart(e, index)} onDragOver={(e) => onDragOver(e, index)} onDrop={onDrop}
+                  className={`relative group transition-all duration-200 ${widget.gridClass} ${draggedIndex === index ? 'opacity-30' : ''} ${dragOverIndex === index ? 'border-2 border-dashed border-indigo-400 rounded-lg bg-indigo-50/50' : 'border-2 border-transparent'}`}
+                >
+                  <div className="absolute top-2 right-2 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="relative">
+                      <button onClick={(e) => { e.stopPropagation(); setActiveResizeMenu(activeResizeMenu === widget.id ? null : widget.id); }} className="bg-white p-1.5 rounded border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-500 transition-colors">
+                        <Layout className="w-4 h-4" />
+                      </button>
+                      {activeResizeMenu === widget.id && (
+                        <div className="absolute top-full right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-30 overflow-hidden" onClick={e => e.stopPropagation()}>
+                           {[ { label: '1/3 Width', class: 'lg:col-span-4' }, { label: '1/2 Width', class: 'lg:col-span-6' }, { label: '2/3 Width', class: 'lg:col-span-8' }, { label: 'Full Width', class: 'lg:col-span-12' } ].map((size) => (
+                             <button key={size.class} onClick={() => handleResizeWidget(widget.id, size.class)} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-50 transition-colors flex items-center justify-between ${widget.gridClass === size.class ? 'text-indigo-600 font-bold bg-indigo-50/50' : 'text-gray-600'}`}>
+                               {size.label} {widget.gridClass === size.class && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />}
+                             </button>
+                           ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-white p-1.5 rounded border border-gray-200 shadow-sm cursor-move text-gray-400 hover:text-indigo-600 transition-colors">
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+                  </div>
+                  {renderWidget(widget)}
                 </div>
-
-                {/* Row 2: Trend Chart (Static) */}
-                <div className="h-[400px]">
-                  <TrendChart data={trendData} />
-                </div>
-
-              </div>
+              ))}
             </div>
-
-            {/* Detailed Team Performance Table - Contains the Dropdown that affects graphs below */}
-            <div className="pb-6">
-              <TeamPerformanceTable 
-                data={filteredTeamPerformance} 
-                allMembers={allTeamMembers}
-                selectedMembers={selectedTeamMembers}
-                onMemberSelectionChange={setSelectedTeamMembers}
-              />
-            </div>
-
-            {/* Team Charts (Side by Side) - Reactive to Table Filter */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 h-[400px]">
-              <AgentPerformanceChart data={filteredTeamPerformance} />
-              <OutcomeBreakdownChart data={filteredTeamPerformance} />
-              <OutcomeDistributionChart data={filteredTeamPerformance} />
-            </div>
-
-            {/* Daily Trend Analysis Chart - Reactive to Table Filter */}
-            <div className="h-[400px] mb-6">
-              <DailyTrendChart data={dailyTrendData} />
-            </div>
-            
-            {/* Call Back Data Table - Reactive to Table Filter */}
-            <div className="mb-6">
-              <CallbackTable data={filteredCallbackData} />
-            </div>
-
-            {/* Lead Conversion Summary Table - Reactive to Table Filter + Local Filter */}
-            <div className="mb-6">
-              <LeadConversionTable 
-                 data={finalLeadConversionData} 
-                 allMembers={uniqueLeadConversionMembers}
-                 selectedMember={leadConversionSelectedMember}
-                 onMemberChange={setLeadConversionSelectedMember}
-              />
-            </div>
-
-            {/* Lead Conversion Charts - Reactive to Table Filter + Local Filter */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px] mb-6">
-               <LeadConversionStackedBarChart data={finalLeadConversionData} />
-               <LeadConversionAgentChart data={finalLeadConversionData} />
-               <LeadConversionPieChart data={finalLeadConversionData} />
-            </div>
-
           </div>
         </main>
       </div>
+      <ChartCustomizer isOpen={!!editingChartId} config={editingChartId ? chartConfigs[editingChartId] : null} onClose={() => setEditingChartId(null)} onApply={handleApplyConfig} />
     </div>
   );
 };

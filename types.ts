@@ -1,3 +1,4 @@
+
 export interface BacklogData {
   name: string;
   value: number;
@@ -27,14 +28,6 @@ export interface DailyTrendData {
   successful: number;
   followUp: number;
   [key: string]: any;
-}
-
-export interface DailyReportItem {
-  label: string;
-  value: number | string;
-  isTotal?: boolean;
-  isHeader?: boolean;
-  highlight?: boolean;
 }
 
 export interface TeamMemberPerformance {
@@ -76,4 +69,26 @@ export interface LeadConversionData {
   attemptedPerc: number; // 0-100
   solvencyPerc: number; // 0-100
   abandoned: number;
+}
+
+export interface ChartSeriesConfig {
+  key: string;
+  name: string;
+  color: string;
+  hidden?: boolean;
+  yAxisId?: string;
+}
+
+export type ChartType = 'bar' | 'line' | 'pie' | 'area';
+
+export interface ChartConfig {
+  id: string;
+  title: string;
+  type: ChartType;
+  xAxisKey: string;
+  yAxisKey?: string;
+  calculatedLogic?: string;
+  series: ChartSeriesConfig[];
+  showTooltip: boolean;
+  showLegend: boolean;
 }
